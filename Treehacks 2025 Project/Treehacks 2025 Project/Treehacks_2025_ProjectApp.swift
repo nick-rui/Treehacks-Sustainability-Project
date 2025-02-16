@@ -2,20 +2,22 @@ import SwiftUI
 
 @main
 struct Treehacks_2025_ProjectApp: App {
-    @State private var immersionStyle: ImmersionStyle = .progressive(1.0...1.0, initialAmount: 0.0)
-    @StateObject private var appState = AppState() // Shared environment object
+    
+    @State private var immersionStyle: ImmersionStyle = .progressive(0...1.0, initialAmount: 1.0)
+    @StateObject private var appState = AppState()
     @State private var appModel = AppModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environment(appState) // Inject environment object
+                .environment(appState)
                 .environment(appModel)
         }
 
+        // Existing main immersive space
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
             ImmersiveView()
-                .environment(appState) // Inject environment object
+                .environment(appState)
                 .environment(appModel)
                 .onAppear {
                     appModel.immersiveSpaceState = .open
@@ -25,11 +27,27 @@ struct Treehacks_2025_ProjectApp: App {
                 }
         }
         .immersionStyle(selection: $immersionStyle, in: .progressive)
+
+        ImmersiveSpace(id: "lifeImmersive") {
+            LifeView()
+                .environment(appState)
+                .environment(appModel)
+                .onAppear {
+                    // Mark the second space as open
+                    appModel.lifeImmersiveSpaceState = .open
+                }
+                .onDisappear {
+                    appModel.lifeImmersiveSpaceState = .closed
+                }
+        }
+        .immersionStyle(selection: .constant(.full), in: .full)
     }
 }
+
 
 @Observable
 class AppState: ObservableObject {
     var pLevel: Int = 1
+    var myRange: ClosedRange<Double> = 1.0...1.0
 }
 

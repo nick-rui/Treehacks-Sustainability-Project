@@ -9,13 +9,16 @@ import SwiftUI
 
 @MainActor
 @Observable
-class AppModel {
-    let immersiveSpaceID = "ImmersiveSpace"
-    enum ImmersiveSpaceState {
-        case closed
-        case inTransition
-        case open
-    }
-    var immersiveSpaceState = ImmersiveSpaceState.closed
+class AppModel: ObservableObject {
+    var immersiveSpaceID: String = "mainImmersive"
+    var immersiveSpaceState: ImmersiveSpaceState = .closed
+
+    // Add a second state for the "lifeImmersive" space:
+    var lifeImmersiveSpaceState: ImmersiveSpaceState = .closed
 }
+
+enum ImmersiveSpaceState {
+    case open, closed, inTransition
+}
+
 
