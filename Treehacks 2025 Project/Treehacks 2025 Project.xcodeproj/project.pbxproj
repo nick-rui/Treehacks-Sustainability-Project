@@ -24,6 +24,7 @@
 		6894C1362D6084EC00B0F286 /* Treehacks 2025 Project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Treehacks 2025 Project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6894C13A2D6084EC00B0F286 /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		6894C1512D6084EE00B0F286 /* Treehacks 2025 ProjectTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Treehacks 2025 ProjectTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		6894C18A2D616E4D00B0F286 /* Food can.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Food can.usdz"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -94,6 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				6894C13A2D6084EC00B0F286 /* RealityKitContent */,
+				6894C18A2D616E4D00B0F286 /* Food can.usdz */,
 			);
 			path = Packages;
 			sourceTree = "<group>";
