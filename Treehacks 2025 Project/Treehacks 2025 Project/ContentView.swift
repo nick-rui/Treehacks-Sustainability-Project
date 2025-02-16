@@ -2,10 +2,6 @@ import SwiftUI
 import RealityKit
 import RealityKitContent
 
-import SwiftUI
-import RealityKit
-import RealityKitContent
-
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @Environment(AppModel.self) private var appModel
@@ -44,4 +40,5 @@ struct ContentView: View {
         .padding()
     }
 }
+
 

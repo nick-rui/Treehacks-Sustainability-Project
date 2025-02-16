@@ -13,6 +13,7 @@ struct ImmersiveView: View {
                 skybox.name = "SkyBox"
                 content.add(skybox)
             }
+            
         } update: { content in
             updateSkybox(with: currentSkybox, content: content)
         }
