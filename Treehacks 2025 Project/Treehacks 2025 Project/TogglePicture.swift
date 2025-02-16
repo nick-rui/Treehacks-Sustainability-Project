@@ -8,16 +8,21 @@
 import SwiftUI
 
 struct TogglePicture: View {
+    @Environment(AppModel.self) private var appModel
+    @EnvironmentObject var appState: AppState
+    
     var body: some View {
         Button(action: {
             // Call the API without parameters
             NetworkManager.shared.fetchDetections { result in
                 switch result {
                 case .success(let detectionResponse):
+                    appState.objects.removeAll()
                     // Handle the successful response
                     print("Detections: \(detectionResponse.detections)")
                     for detection in detectionResponse.detections {
-                        print("Object: \(detection.object), Confidence: \(detection.confidence), BBox: \(detection.bbox)")
+                        let classifacationResult = ClassificationResult(object: entityMap.mappedItems[detection.object] ?? "Drink can", confidence: detection.confidence, bbox: detection.bbox)
+                        appState.objects.append(classifacationResult)
                     }
                 case .failure(let error):
                     // Handle the error

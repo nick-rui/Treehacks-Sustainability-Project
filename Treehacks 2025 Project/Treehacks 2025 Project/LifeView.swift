@@ -6,28 +6,32 @@ struct LifeView: View {
     @EnvironmentObject var appState: AppState
     @Environment(AppModel.self) private var appModel
 
-    // We'll keep the same references for the pizza box and bins.
-    static var model = Entity()
     static var trash = Entity()
     static var recycle = Entity()
     static var trashRect = ModelEntity()
     static var recycleRect = ModelEntity()
 
     @State private var collisionSubscription: EventSubscription?
+    @State private var entityCategories: [ObjectIdentifier: String] = [:]
 
     var body: some View {
         RealityView { content in
-            // 1) Add the "Forest" for visuals, using createForest.
+            if let skybox = createSkybox(named: "Sky") {
+                print("Skybox Loaded")
+                skybox.name = "SkyBox"
+                content.add(skybox)
+            }
+
+            
+            // 1) Load "Forest"
             if let forest = createForest(named: "Forest \(Int(appState.fLevel.rounded()))") {
-                print("Forest Loaded: Forest \(Int(appState.fLevel.rounded()))")
-                forest.name = "ForestEntity"  // Tag it so we can find/update later
+                forest.name = "ForestEntity"
                 content.add(forest)
             }
 
-            // 2) Invisible floor plane
+            // 2) Floor plane (static)
             let planeSize: SIMD3<Float> = [25, 0.01, 25]
             let planeShape = ShapeResource.generateBox(size: planeSize)
-
             let floorEntity = Entity()
             floorEntity.position = [0, 0, 0]
             floorEntity.components.set([
@@ -40,33 +44,81 @@ struct LifeView: View {
             ])
             content.add(floorEntity)
 
-            // 3) "Pizza box" (initially kinematic)
-            if let pizzaBox = try? await Entity(named: "Pizza box") {
-                let collisionShape = ShapeResource.generateSphere(radius: 2200)
-                pizzaBox.position = [0, 0.9, -1]
-                pizzaBox.scale = [0.0001, 0.0001, 0.0001]
+            // 3) Load at most 8 items from appState.objects
+            for classification in appState.objects.prefix(10) {
+                let modelName = classification.object
+                do {
+                    // Attempt to load the asset named modelName
+                    let entity = try await Entity(named: modelName)
 
-                pizzaBox.components.set([
-                    CollisionComponent(shapes: [collisionShape], mode: .default),
-                    InputTargetComponent(),
-                    PhysicsBodyComponent(
-                        massProperties: .init(),
-                        material: .default,
-                        mode: .kinematic
-                    )
-                ])
+                    // If entityMap has an entry, apply scale + collision
+                    if let entry = entityMap.map[modelName] {
+                        let (scale, _, collisionRadius, category) = (
+                            entry.scale,
+                            entry.position,
+                            entry.collisionRadius,
+                            entry.category
+                        )
+                        entity.scale = scale
 
-                Self.model = pizzaBox
-                content.add(pizzaBox)
-            } else {
-                print("Error loading Pizza box")
+                        // Random spawn angle in [0, 2π), distance in [0.5, 1.5)
+                        let angle = Float.random(in: 0 ..< 2 * Float.pi)
+                        let radius = Float.random(in: 0.5 ..< 1.5)
+                        let x = radius * cos(angle)
+                        let z = radius * sin(angle)
+                        entity.position = [x, 0.2, z]
+
+                        // For more precise selection, shrink collision radius
+                        let smallerRadius = collisionRadius * 0.15
+                        let collisionShape = ShapeResource.generateSphere(radius: smallerRadius)
+
+                        // Start as kinematic
+                        entity.components.set([
+                            CollisionComponent(shapes: [collisionShape], mode: .default),
+                            InputTargetComponent(),
+                            PhysicsBodyComponent(
+                                massProperties: .init(),
+                                material: .default,
+                                mode: .kinematic
+                            )
+                        ])
+
+                        // Store the category so we can check it on collision
+                        entityCategories[ObjectIdentifier(entity)] = category
+
+                    } else {
+                        // No dictionary entry => default transform
+                        print("No entry in entityMap for \(modelName). Using random position.")
+                        let angle = Float.random(in: 0 ..< 2 * Float.pi)
+                        let radius = Float.random(in: 0.5 ..< 1.5)
+                        let x = radius * cos(angle)
+                        let z = radius * sin(angle)
+                        entity.position = [x, 0.2, z]
+
+                        entity.components.set([
+                            CollisionComponent(shapes: [.generateSphere(radius: 0.3)], mode: .default),
+                            InputTargetComponent(),
+                            PhysicsBodyComponent(
+                                massProperties: .init(),
+                                material: .default,
+                                mode: .kinematic
+                            )
+                        ])
+
+                        // We'll assume "trash" if not in dictionary, or skip storing
+                        entityCategories[ObjectIdentifier(entity)] = "trash"
+                    }
+
+                    content.add(entity)
+                } catch {
+                    print("Error loading \(modelName): \(error)")
+                }
             }
 
-            // 4) Trash Can
+            // 4) Trash can (static)
             if let trashCan = try? await Entity(named: "Trash Can") {
                 trashCan.position = [0.7125, 0, -1.575]
                 trashCan.scale = [0.0035, 0.0035, 0.0035]
-
                 let trashShape = ShapeResource.generateSphere(radius: 625)
                 trashCan.components.set([
                     CollisionComponent(shapes: [trashShape], mode: .default),
@@ -78,15 +130,12 @@ struct LifeView: View {
                 ])
                 Self.trash = trashCan
                 content.add(trashCan)
-            } else {
-                print("Error loading Trash Can")
             }
 
-            // 5) Recycle Bin
+            // 5) Recycle bin (static)
             if let recycleBin = try? await Entity(named: "Recycle Bin") {
                 recycleBin.position = [-0.3875, 0.15, -1.575]
                 recycleBin.scale = [0.0035, 0.0035, 0.0035]
-
                 let recycleShape = ShapeResource.generateSphere(radius: 625)
                 recycleBin.components.set([
                     CollisionComponent(shapes: [recycleShape], mode: .default),
@@ -98,11 +147,9 @@ struct LifeView: View {
                 ])
                 Self.recycle = recycleBin
                 content.add(recycleBin)
-            } else {
-                print("Error loading Recycle Bin")
             }
 
-            // 6) Debug boxes (invisible)
+            // 6) Debug boxes (static)
             let invisibleMaterial = SimpleMaterial(color: .clear, isMetallic: false)
             let boxSize: SIMD3<Float> = [0.3, 0.75, 0.3]
             let boxMesh = MeshResource.generateBox(size: boxSize)
@@ -141,7 +188,7 @@ struct LifeView: View {
             content.add(recycleRectEntity)
 
         } update: { content in
-            // 7) "Update" function: if forest changed, re-load
+            // If forest changed, re-load
             updateForest(content: content)
 
             // Subscribe collisions once
@@ -151,36 +198,40 @@ struct LifeView: View {
                 }
             }
         }
-        .onChange(of: appState.fLevel) { oldValue, newValue in
-            // 8) If fLevel changed, re-run the "update" closure
+        .onChange(of: appState.fLevel) { _, _ in
             Task {
                 updateRealityKitScene()
             }
         }
-        // Drag gesture
+        // 7) Drag logic: remove dynamic on drag, restore dynamic on end
         .gesture(
             DragGesture()
-                .targetedToEntity(Self.model)
+                .targetedToAnyEntity()
                 .onChanged { value in
-                    guard let parent = value.entity.parent else { return }
-                    value.entity.position = value.convert(value.location3D, from: .local, to: parent)
-                    value.entity.components[PhysicsBodyComponent.self] = nil
+                    let entity = value.entity
+                    guard let parent = entity.parent else { return }
+
+                    // Remove dynamic so it won't drop mid-drag
+                    entity.components[PhysicsBodyComponent.self] = nil
+
+                    let newPosition = value.convert(value.location3D, from: .local, to: parent)
+                    entity.position = newPosition
                 }
                 .onEnded { value in
+                    let entity = value.entity
+                    // Set dynamic so it falls & collides
                     var body = PhysicsBodyComponent(
                         massProperties: .init(),
                         material: .default,
                         mode: .dynamic
                     )
                     body.isAffectedByGravity = true
-                    value.entity.components.set(body)
+                    entity.components.set(body)
                 }
         )
     }
 
-    // MARK: - "Skybox-like" Functions
-
-    /// Create the forest entity if it doesn't exist yet
+    // MARK: - "Skybox-like" forest code
     private func createForest(named forestName: String) -> Entity? {
         do {
             let forest = try Entity.load(named: forestName)
@@ -194,20 +245,15 @@ struct LifeView: View {
         }
     }
 
-    /// In the update closure, find the existing "ForestEntity" and update it if needed
     private func updateForest(content: RealityViewContent) {
         guard let forestEntity = content.entities.first(where: { $0.name == "ForestEntity" }) else {
-            // No forest found; maybe we just loaded a new one
             return
         }
         let newName = "Forest \(Int(appState.fLevel.rounded()))"
 
-        // If this forest doesn't match the new name, remove & re-load
         if !forestEntity.isCurrentlyNamed(newName) {
-            // Remove old forest
             forestEntity.removeFromParent()
 
-            // Attempt to create the new forest
             if let updatedForest = createForest(named: newName) {
                 content.add(updatedForest)
             }
@@ -222,31 +268,62 @@ struct LifeView: View {
         }
     }
 
-    /// Handle collisions: remove pizza box & increment fLevel
     private func handleCollision(event: CollisionEvents.Began) {
         let a = event.entityA
         let b = event.entityB
 
-        if (a == Self.model && b == Self.trashRect) ||
-           (b == Self.model && a == Self.trashRect) ||
-            (a == Self.model && b == Self.recycleRect) ||
-            (b == Self.model && a == Self.recycleRect)
-        {
-            Self.model.removeFromParent()
-            appState.fLevel += 0.25
+        // If trashRect or recycleRect is one entity, the other is the object
+        // We'll remove the object from the scene. If category matches, we increment fLevel by 0.25
+        // then clamp to 5.26
+        if a == Self.trashRect && b != Self.trashRect {
+            // b is the item
+            removeEntityIfMatch(b, bin: "trash")
+        }
+        else if b == Self.trashRect && a != Self.trashRect {
+            // a is the item
+            removeEntityIfMatch(a, bin: "trash")
+        }
+        else if a == Self.recycleRect && b != Self.recycleRect {
+            removeEntityIfMatch(b, bin: "recycle")
+        }
+        else if b == Self.recycleRect && a != Self.recycleRect {
+            removeEntityIfMatch(a, bin: "recycle")
+        }
+    }
+
+    /// Remove the entity from the scene. If its category matches `bin`, increment fLevel.
+    private func removeEntityIfMatch(_ entity: Entity, bin: String) {
+        entity.removeFromParent()
+
+        // Check category
+        if let category = entityCategories[ObjectIdentifier(entity)], category == bin {
+            appState.fLevel += 0.4
             appState.fLevel = min(appState.fLevel, 5.26)
         }
     }
+    
+    private func createSkybox(named skyboxName: String) -> Entity? {
+        let largeSphere = MeshResource.generateSphere(radius: 10)
+        var skyboxMaterial = UnlitMaterial()
+        
+        do {
+            let texture = try TextureResource.load(named: skyboxName)
+            skyboxMaterial.color = .init(texture: .init(texture))
+        } catch {
+            print("Failed to create skybox material: \(error)")
+            return nil
+        }
+        
+        let skyboxEntity = ModelEntity(mesh: largeSphere, materials: [skyboxMaterial])
+        skyboxEntity.transform.scale = SIMD3<Float>(-1, 1, 1)
+        
+        return skyboxEntity
+    }
 }
 
-
-// Optional helper extension to compare the "Forest 2" name
+// Optional extension
 private extension Entity {
     func isCurrentlyNamed(_ newName: String) -> Bool {
-        // E.g. "ForestEntity" is the entity's name,
-        // but we might store the "Forest 2" string in a property if needed
-        // For simplicity, let's just always re-load if we want a new forest
-        // Or store a custom component with the real "forest name" if you prefer
         return false
     }
 }

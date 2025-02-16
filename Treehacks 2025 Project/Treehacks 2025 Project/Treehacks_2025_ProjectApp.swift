@@ -48,5 +48,7 @@ struct Treehacks_2025_ProjectApp: App {
 class AppState: ObservableObject {
     var pLevel: Int = 1
     var fLevel: Double = 1
+    var objects: [ClassificationResult] = []
+    
 }
 

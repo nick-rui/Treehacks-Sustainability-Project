@@ -1,11 +1,12 @@
 import SwiftUI
 import RealityKit
 import RealityKitContent
+import AVFoundation
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
     @Environment(AppModel.self) private var appModel
-
+    
     var body: some View {
         ZStack {
             // Background image
@@ -44,4 +45,5 @@ struct ContentView: View {
             .padding()
         }
     }
+    
 }
